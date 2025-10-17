@@ -1,183 +1,191 @@
----
-title: SkimLit-Style Abstract Classifier  
-emoji: 🧪  
-colorFrom: blue  
-colorTo: green  
-sdk: streamlit  
-sdk_version: 1.39.0  
-app_file: app.py  
-pinned: false  
-short_description: Predict roles/classes in medical abstracts with classic baselines and a BERT (model_6) system, plus a simple Streamlit predictor.
+#  MedText Classifier
+
+A state-of-the-art **medical abstract classification system** built on the [PubMed RCT dataset](https://github.com/Franck-Dernoncourt/pubmed-rct).  
+This project demonstrates a **complete NLP pipeline** — from data ingestion and preprocessing to multiple deep learning models for classifying scientific sentences into structured labels such as `BACKGROUND`, `OBJECTIVE`, `METHODS`, `RESULTS`, and `CONCLUSIONS`.
+
 ---
 
-# SkimLit-Style Abstract Classifier
+##  Table of Contents
+- [Overview](#-overview)
+- [Key Features](#-key-features)
+- [Dataset](#-dataset)
+- [Architecture](#-architecture)
+- [Installation](#-installation)
+- [Usage](#-usage)
+- [Model Training](#-model-training)
+- [Evaluation & Results](#-evaluation--results)
+- [Tech Stack](#-tech-stack)
+- [Project Structure](#-project-structure)
+- [Contributing](#-contributing)
+- [License](#-license)
 
-## Overview
+---
 
-**Problem in a sentence**  
-The number of RCT papers is exploding, and abstracts that aren’t clearly structured slow researchers down. Sifting through “Background, Methods, Results, Conclusions” by hand is tedious and error-prone (see screenshot).  
+##  Overview
 
-**Solution in a sentence**  
-Build an NLP pipeline that learns to classify text from medical abstracts—first at the sentence level (roles like *BACKGROUND*, *METHODS*, *RESULTS*, *CONCLUSIONS*), and then provide a lightweight app that predicts the overall abstract class using the final **`model_6`** BERT system.
+Medical abstracts often follow a standardized structure. This project builds an NLP pipeline to automatically classify each sentence of an abstract into its correct **section category**, enabling downstream applications like literature summarization, evidence synthesis, and clinical decision support.
 
-### What this repo covers
-- A complete workflow inspired by the SkimLit approach:
-  - Data loading and preprocessing for **PubMed 20k RCT**.
-  - Multiple modeling experiments (TF-IDF baselines → token/char CNNs → hybrids → **BERT**).
-  - Saved final model (**`model_6`**) and a **Streamlit** app that predicts abstract class (prediction-only; no evaluation in the UI).
-- Clear pointers to how to reproduce the experiments in the notebook and use the app for inference.
+The project is implemented in Python and leverages deep learning architectures such as Conv1D and LSTMs to achieve strong classification performance.
 
-The screenshot (`/mnt/data/bc37c9a2-3a68-42c9-b21a-2ff23531cd44.png`) summarizes the problem, solution, and learning plan we followed.
+---
+
+## Key Features
+
+-  **Text Preprocessing**: Tokenization, sentence splitting, label encoding, padding/truncation.  
+-  **Multiple Models**:
+  - Baseline model with TF-IDF + Mutltinomial
+  - Conv1D with token Embedding layers
+  - Feature Extraction with pretrained token embediings (Universal sentence Encoder)
+  - Conv1D with character embeddings
+  - Pretrained (USE) token embed + Char embed with Bi-LSTM
+  - Pretrained (USE) token embed + Char embed with Bi-LSTM plus postional embeddings
+  - Pretrained token BERT (SOTA)  + Char embed with Bi-LSTM plus postional embeddings
+-  **Robust Evaluation**: Accuracy, Precision, Recall, F1-score.
+-  **Data Visualization**: Sentence length distribution, label frequencies.
+-  **Reproducible pipeline**: Clean notebook, modular code design.
 
 ---
 
 ## Dataset
 
-**Source:** PubMed 20k RCT (numbers replaced with `@`) — a widely used dataset for sequential sentence classification in medical abstracts.
+The project uses the **PubMed RCT 20k dataset**, a collection of randomized controlled trial abstracts where each line is annotated with one of the following labels:
 
-- **Total abstracts:** **20,000**
-- **Split used:** **18,000 train / 2,000 dev / 2,000 test** (abstract-level; each abstract contains labeled sentences)
-- **Sentence labels:** `BACKGROUND`, `OBJECTIVE`, `METHODS`, `RESULTS`, `CONCLUSIONS`
-- **Preprocessing (notebook):**
-  - Parse `.txt` files into `(abstract_id, label, sentence)` rows
-  - Clean text (minimal; preserve biomedical tokens)
-  - Encode labels with `LabelEncoder`
-  - For transformer models: tokenize with **Hugging Face `bert-base-uncased`** to fixed length (`SEQ_LEN=128`)
+- `BACKGROUND`  
+- `OBJECTIVE`  
+- `METHODS`  
+- `RESULTS`  
+- `CONCLUSIONS`
 
-> The notebook handles the splits and label encoding; the app consumes the already-saved model for prediction.
+Dataset files:
+```
+train.txt
+dev.txt
+test.txt
+```
+
+> **Source**: [Franck-Dernoncourt/pubmed-rct](https://github.com/Franck-Dernoncourt/pubmed-rct)
 
 ---
 
-## Experiments
+##  Architecture
 
-The notebook steps through a series of models, increasing in capacity and prior knowledge. The variable names below mirror the code:
-
-1. **`baseline` — TF-IDF → Linear Classifier (e.g., MultinomialNB / Logistic)**
-   - **What:** Classic bag-of-words with n-grams.
-   - **Why:** Establish a quick, interpretable baseline.
-   - **Notes:** No deep features; fast to train and a strong sanity check.
-
-2. **`model_1` — `custom_token_embed_conv1d`**
-   - **What:** Learnable token embeddings + 1D CNN stack.
-   - **Why:** Capture local n-gram patterns with convolutional filters.
-   - **Notes:** Pure token path; regularization via dropout.
-
-3. **`model_2` — `pretrained_token_embed`**
-   - **What:** Swap in pretrained token embeddings (vs. random init).
-   - **Why:** Inject distributional prior to improve generalization, especially for rarer medical terms.
-
-4. **`model_3` — `custom_char_embed_conv1d`**
-   - **What:** Character-level embeddings + CNNs.
-   - **Why:** Robust to misspellings, punctuation quirks, and OOV tokens common in clinical text.
-
-5. **`model_4` — `hybrid_char_token_embed`**
-   - **What:** Concatenate **token** and **character** paths.
-   - **Why:** Blend subword robustness with token semantics.
-
-6. **`model_5` — `tribrid_pos_char_token_embed`**
-   - **What:** Add a simple **positional**/sequence-aware signal to the hybrid.
-   - **Why:** Sentence roles in abstracts strongly follow order (e.g., *BACKGROUND* → *METHODS* → *RESULTS* → *CONCLUSIONS*).
-
-7. **`model_6` — `tribrid_bert_classifier` (final)**
-   - **What:** A **BERT** path built with Hugging Face `bert-base-uncased` (TensorFlow) producing a pooled representation, projected to a 128-dim token embedding and integrated with the existing architecture. Implemented with custom Lambda layers:
-     - `_hf_tokenize_layer` (wraps HF tokenization under `tf.numpy_function`)
-     - `_squeeze_if_needed` (utility for shape handling)
-   - **Training details (from notebook code):**
-     - `CategoricalCrossentropy(label_smoothing=0.2)`
-     - `keras.optimizers.Adam()`
-     - `SEQ_LEN = 128`
-     - Backbones instantiated via `TFBertModel.from_pretrained(...)`
-   - **Why:** Modern transformer representations capture long-range context and biomedical semantics better than shallow features.
-
-### Evaluation results
-
-The notebook computes evaluation tables (accuracy/precision/recall/F1) for each model and aggregates them into `all_model_results`, which includes:
-
-```
-baseline
-custom_token_embed_conv1d
-pretrained_token_embed
-custom_char_embed_conv1d
-hybrid_char_token_embed
-tribrid_pos_char_token_embed
-tribrid_bert_classifier
-```
-
-> Exact numeric scores are presented in the notebook’s outputs (the app intentionally **does not** show metrics; it’s prediction-only). The observed trend is the expected one: classical baselines → token/char CNNs → hybrids → **BERT (`model_6`)** improving the overall classification quality.
+1. **Data Layer**: Load and parse text data from structured files.  
+2. **Preprocessing Layer**:
+   - Clean sentences
+   - Encode labels (label + one-hot)
+   - Tokenize and vectorize
+3. **Modeling Layer**:
+   - TF-IDF + Logistic Regression (baseline)
+   - Conv1D + Embedding
+   - Bi-LSTM architectures
+4. **Evaluation Layer**:
+   - Accuracy, Precision, Recall, F1-score
+   - Visualization of results
 
 ---
 
-## Application (prediction-only)
-
-We ship a small **Streamlit** app to make predictions with the **final BERT system (`model_6`)**:
-
-- Loads a **SavedModel** directory (default: `./save_model`) created in the notebook:  
-  `model_6.save("save_model")`
-- Reconstructs the tokenizer and custom functions so the graph loads cleanly.
-- **Two modes:**
-  - **Single abstract:** paste text, get predicted class + confidence.
-  - **Batch:** upload a CSV with one `abstract` column; download predictions.
-
-> The app does not evaluate or fine-tune; it reuses the trained weights for fast inference.
-
-### Run locally
+## Installation
 
 ```bash
-# minimal runtime stack
-pip install -U streamlit tensorflow tf-keras transformers pandas numpy
+# Clone this repository
+git clone https://github.com/yourusername/medtext-classifier.git
+cd medtext-classifier
 
-# start the app
-streamlit run app.py
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate    # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-If your model folder is zipped, upload it in the sidebar; otherwise point the path to `save_model`.
-
----
-
-## Project Structure
-
+### Example `requirements.txt`:
 ```
-.
-├── app.py                # Streamlit prediction app (uses ONLY model_6)
-├── Notebook.ipynb        # Full experiment pipeline and training code
-├── save_model/           # (not tracked) Keras SavedModel produced by model_6
-├── requirements.txt      # (optional) consolidated dependencies
-└── README.md             # this document
+numpy
+pandas
+tensorflow
+tf_keras
+scikit-learn
+matplotlib
+seaborn
+jupyter
 ```
 
 ---
 
-## Reproducibility notes
+##  Usage
 
-- **Randomness:** Set seeds where practical; deep models may still vary slightly.
-- **Hardware:** Transformer experiments train faster on GPU.
-- **Data:** Ensure you’re using the **20k** split (`train/dev/test`), not the 200k variant.
-- **Sequence length:** Notebook uses `SEQ_LEN=128`; keep this consistent when exporting and serving.
+Launch Jupyter Notebook to explore the pipeline:
 
----
+```bash
+jupyter notebook Notebook.ipynb
+```
 
-## Limitations & future work
-
-- **Sentence vs. abstract scope:** The experimental focus is sentence-role modeling; the shipped app performs **abstract-level** prediction with the final system for simplicity. Extending the UI to show **per-sentence** labels (and highlight spans) would better mirror the research goal.
-- **Domain shift:** Biomedical terminology is nuanced; consider domain-specific BERT variants (e.g., BioBERT, PubMedBERT) for further gains.
-- **Structure awareness:** Adding explicit sequential modeling (e.g., CRF over sentence roles) could improve consistency across an abstract.
 
 ---
 
-## Acknowledgments
+## Model Training
 
-- SkimLit concept and dataset preparation pipelines from prior literature on **PubMed 20k RCT**.
-- Hugging Face Transformers for the BERT backbone and tokenizer.
-- TensorFlow / Keras for modeling; Streamlit for app delivery.
+1. **Load Dataset**  
+2. **Preprocess Sentences and Labels**  
+3. **Vectorize Text (TextVectorization or TF-IDF)**  
+4. **Train Model** 
+5. **Evaluate on Dev/Test**
+
+---
+
+## Evaluation & Results
+
+Metrics computed:
+- Accuracy  
+- Precision  
+- Recall  
+- F1-score  
+
+![alt text](image.png)
+
+
+---
+
+## Tech Stack
+
+- **Language**: Python 3.x  
+- **Libraries**: TensorFlow, scikit-learn, NumPy, Pandas, Matplotlib, Seaborn , Transformers
+- **Notebook**: Jupyter  
+- **Dataset**: PubMed RCT 20k
+
+---
+
+
+## Contributing
+
+Contributions are welcome!
+
+1. Fork the project  
+2. Create a feature branch: `git checkout -b feature/your-feature`  
+3. Commit changes: `git commit -m "Add feature"`  
+4. Push to branch: `git push origin feature/your-feature`  
+5. Open a Pull Request
 
 ---
 
 ## Author
 
-Built by **Dagogo Orifama**.  
-For questions or collaboration:
+This project was developed by Opeyemi Aina
 
-- GitHub: <https://github.com/DagogoOrifama>  
-- LinkedIn: <https://www.linkedin.com/in/dagogoorifama/>  
+## License
 
-> If you want this README mirrored on a Space, keep the YAML block at the top (`app_file: app.py`) so it deploys smoothly.
+This project is licensed under the **MIT License**.  
+You are free to use, modify, and distribute with attribution.
+
+---
+
+
+## References
+
+- [Franck-Dernoncourt/pubmed-rct](https://github.com/Franck-Dernoncourt/pubmed-rct)
+- TensorFlow Documentation
+- scikit-learn Documentation
+- Academic Paper: [PubMed 200k RCT: a Dataset for Sequential Sentence Classification in Medical Abstracts](https://arxiv.org/abs/1710.06071)
+
+---
