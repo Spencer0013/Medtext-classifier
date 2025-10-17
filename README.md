@@ -75,9 +75,14 @@ test.txt
    - Encode labels (label + one-hot)
    - Tokenize and vectorize
 3. **Modeling Layer**:
-   - TF-IDF + Logistic Regression (baseline)
+   - TF-IDF + Multinomial (baseline)
    - Conv1D + Embedding
-   - Bi-LSTM architectures
+   - Pretrained Universal Sentence Encoder
+   - Conv1D + character embeddings
+   - Pretrained (USE)  + Char embed with Bi-LSTM
+   - Pretrained (USE)  + Char embed + Bi-LSTM + positional embeddings
+   - Pretrained BERT (SOTA)  + Char embed + Bi-LSTM + positional embeddings
+   -
 4. **Evaluation Layer**:
    - Accuracy, Precision, Recall, F1-score
    - Visualization of results
@@ -142,7 +147,7 @@ Metrics computed:
 - Recall  
 - F1-score  
 
-![alt text](image.png)
+![alt text](<Screenshot 2025-10-17 154257.png>)
 
 
 ---
