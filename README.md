@@ -147,7 +147,8 @@ Metrics computed:
 - Recall  
 - F1-score  
 
-![alt text](<Screenshot 2025-10-17 154257.png>)
+<img width="622" height="307" alt="image" src="https://github.com/user-attachments/assets/cc9186ea-72e0-4a37-b36f-0eea18fa7e13" />
+
 
 
 ---
