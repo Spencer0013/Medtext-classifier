@@ -1,0 +1,8 @@
+pandas
+ipykernel
+numpy
+matplotlib
+seaborn
+scikit-learn
+tensorflow_hub
+tf_keras
